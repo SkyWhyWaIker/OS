@@ -1,0 +1,35 @@
+#!/bin/bash
+
+restore_dir="$HOME/restore"
+backup_dir=""
+
+# Find most recent backup directory
+for dir in "$HOME"/Backup-*; do
+    if [ -d "$dir" ]; then
+        if [ -z "$backup_dir" ] || [ "$dir" -nt "$backup_dir" ]; then
+            backup_dir="$dir"
+        fi
+    fi
+done
+
+if [ -z "$backup_dir" ]; then
+    echo "Error: No backup directory found"
+    exit 1
+fi
+
+# Create restore directory if needed
+mkdir -p "$restore_dir" || { echo "Error: Cannot create restore directory"; exit 1; }
+
+# Copy files excluding versioned ones
+for file in "$backup_dir"/*; do
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        
+        # Skip versioned files (with date in name)
+        if [[ ! "$filename" =~ \.[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            cp "$file" "$restore_dir/$filename"
+        fi
+    fi
+done
+
+echo "Files restored from $backup_dir to $restore_dir"
