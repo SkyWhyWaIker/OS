@@ -1,0 +1,67 @@
+#!/bin/bash
+
+source_dir="$HOME/source"
+backup_report="$HOME/backup-report"
+current_date=$(date +%Y-%m-%d)
+
+# Find existing backup directories not older than 7 days
+recent_backup=""
+for dir in "$HOME"/Backup-*; do
+    if [ -d "$dir" ]; then
+        dir_date=$(basename "$dir" | cut -d'-' -f2-)
+        dir_seconds=$(date -d "$dir_date" +%s 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            current_seconds=$(date +%s)
+            diff_days=$(( (current_seconds - dir_seconds) / 86400 ))
+            if [ $diff_days -le 7 ]; then
+                recent_backup="$dir"
+                break
+            fi
+        fi
+    fi
+done
+
+if [ -z "$recent_backup" ]; then
+    # Create new backup directory
+    backup_dir="$HOME/Backup-$current_date"
+    mkdir "$backup_dir" || { echo "Error: Cannot create backup directory"; exit 1; }
+    
+    # Copy all files from source
+    cp -r "$source_dir"/* "$backup_dir/" 2>/dev/null
+    
+    # Write to report
+    echo "[$current_date] Created new backup directory: $backup_dir" >> "$backup_report"
+    echo "Copied files:" >> "$backup_report"
+    find "$source_dir" -type f -exec basename {} \; >> "$backup_report"
+else
+    # Use existing backup directory
+    backup_dir="$recent_backup"
+    echo "[$current_date] Updated backup directory: $backup_dir" >> "$backup_report"
+    
+    # Process each file in source
+    for file in "$source_dir"/*; do
+        if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            backup_file="$backup_dir/$filename"
+            
+            if [ ! -f "$backup_file" ]; then
+                # File doesn't exist in backup - copy it
+                cp "$file" "$backup_file"
+                echo "Added: $filename" >> "$backup_report"
+            else
+                # Compare file sizes
+                source_size=$(stat -c%s "$file")
+                backup_size=$(stat -c%s "$backup_file")
+                
+                if [ "$source_size" -ne "$backup_size" ]; then
+                    # Create versioned copy
+                    versioned_name="$backup_file.$current_date"
+                    mv "$backup_file" "$versioned_name"
+                    cp "$file" "$backup_file"
+                    
+                    echo "Updated: $filename (previous version saved as $filename.$current_date)" >> "$backup_report"
+                fi
+            fi
+        fi
+    done
+fi
