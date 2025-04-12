@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <filename>"
+    exit 1
+fi
+
+file="$1"
+if [ ! -e "$file" ]; then
+    echo "Error: File '$file' does not exist"
+    exit 1
+fi
+
+trash_dir="$HOME/.trash"
+trash_log="$HOME/trash.log"
+
+if [ ! -d "$trash_dir" ]; then
+    mkdir "$trash_dir" || { echo "Error: Cannot create trash directory"; exit 1; }
+fi
+
+# Generate unique name for the hard link
+link_name=$(date +%s)
+while [ -e "$trash_dir/$link_name" ]; do
+    link_name=$((link_name + 1))
+done
+
+# Create hard link and remove original file
+ln "$file" "$trash_dir/$link_name" || { echo "Error: Cannot create hard link"; exit 1; }
+rm "$file" || { echo "Error: Cannot remove original file"; exit 1; }
+
+# Record to log file
+echo "$(realpath "$file") $link_name" >> "$trash_log"
