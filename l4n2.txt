@@ -1,0 +1,62 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <filename>"
+    exit 1
+fi
+
+target_file="$1"
+trash_dir="$HOME/.trash"
+trash_log="$HOME/trash.log"
+
+if [ ! -f "$trash_log" ]; then
+    echo "Error: trash.log not found"
+    exit 1
+fi
+
+matches=()
+while IFS= read -r line; do
+    original_path=$(echo "$line" | awk '{print $1}')
+    link_name=$(echo "$line" | awk '{print $2}')
+    filename=$(basename "$original_path")
+    
+    if [ "$filename" = "$target_file" ]; then
+        matches+=("$original_path $link_name")
+    fi
+done < "$trash_log"
+
+if [ ${#matches[@]} -eq 0 ]; then
+    echo "No matches found for '$target_file' in trash"
+    exit 0
+fi
+
+for match in "${matches[@]}"; do
+    original_path=$(echo "$match" | awk '{print $1}')
+    link_name=$(echo "$match" | awk '{print $2}')
+    
+    read -p "Restore '$original_path'? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        # Check if original directory exists
+        dir=$(dirname "$original_path")
+        restore_dir="$dir"
+        if [ ! -d "$dir" ]; then
+            restore_dir="$HOME"
+            echo "Original directory doesn't exist, restoring to home directory"
+        fi
+        
+        # Check for filename conflicts
+        restore_path="$restore_dir/$(basename "$original_path")"
+        if [ -e "$restore_path" ]; then
+            read -p "File '$restore_path' exists. Enter new name: " new_name
+            restore_path="$restore_dir/$new_name"
+        fi
+        
+        # Create hard link and remove from trash
+        ln "$trash_dir/$link_name" "$restore_path" || { echo "Error: Cannot restore file"; continue; }
+        rm "$trash_dir/$link_name" || { echo "Error: Cannot remove file from trash"; continue; }
+        
+        # Remove entry from trash.log
+        sed -i "/$link_name$/d" "$trash_log"
+        echo "File restored to '$restore_path'"
+    fi
+done
