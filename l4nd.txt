@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Создаем тестовые файлы с "проблемными" именами
+touch "file with spaces.txt"
+touch "-file.txt"
+touch "\\backslash\\file.txt"
+touch "??.txt"
+touch "&.txt"
+touch "|file|.txt"
+touch "#abc.txt"
+touch "'d d'.txt"
+touch "\"quote\".txt"
+touch -e "file\nname.txt"
+
+# Создаем вложенные каталоги с такими же именами
+mkdir -p "dir with space/subdir?"
+mkdir -p "dir-with-dash/subdir&"
+mkdir -p "dir\\with\\backslash"
+mkdir -p "dir?with?question"
